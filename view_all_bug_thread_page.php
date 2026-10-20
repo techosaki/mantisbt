@@ -33,9 +33,15 @@ $t_filter[FILTER_PROPERTY_SORT_DIRECTION] = 'DESC';
 $t_per_page = 10;
 $t_page_count = 0;
 $t_bug_count = 0;
-# Ignore sticky ordering and allow sorting even if Updated is not a visible column.
-$t_rows = filter_get_bug_rows( $f_page_number, $t_per_page, $t_page_count,
-	$t_bug_count, $t_filter, null, null, false, false );
+# Sort the complete filtered result before limiting it to the requested page.
+$t_query = new BugThreadFilterQuery( filter_ensure_valid_filter( $t_filter ) );
+$t_bug_count = $t_query->get_bug_count();
+$t_page_count = filter_page_count( $t_bug_count, $t_per_page );
+$f_page_number = filter_valid_page_number( $f_page_number, $t_page_count );
+$t_query->set_limit( $t_per_page );
+$t_query->set_offset( filter_offset( $f_page_number, $t_per_page ) );
+$t_rows = $t_bug_count ? $t_query->fetch_all() : array();
+$t_rows = filter_cache_result( $t_rows, array_column( $t_rows, 'id' ) );
 
 require_css( 'bug_threads.css' );
 compress_enable();
