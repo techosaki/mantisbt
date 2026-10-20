@@ -1,0 +1,61 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "${MANTIS_HTTP_PORT:-8082}:80"
+    volumes:
+      - .:/var/www/html
+      - composer-vendor:/var/www/html/vendor
+    environment:
+      TZ: ${TZ:-Asia/Tokyo}
+      MANTIS_DB_HOST: db
+      MANTIS_DB_PORT: 3306
+      MANTIS_DB_NAME: ${MANTIS_DB_NAME:-mantisbt}
+      MANTIS_DB_USER: ${MANTIS_DB_USER:-mantisbt}
+      MANTIS_DB_PASSWORD: ${MANTIS_DB_PASSWORD:-mantisbt}
+      MANTIS_CRYPTO_MASTER_SALT: ${MANTIS_CRYPTO_MASTER_SALT:-local-development-only-change-this-salt}
+      MANTIS_URL: ${MANTIS_URL:-http://localhost:8082/}
+      MANTIS_WEBMASTER_EMAIL: ${MANTIS_WEBMASTER_EMAIL:-webmaster@mantisbt.test}
+      MANTIS_FROM_EMAIL: ${MANTIS_FROM_EMAIL:-noreply@mantisbt.test}
+      MANTIS_RETURN_PATH_EMAIL: ${MANTIS_RETURN_PATH_EMAIL:-admin@mantisbt.test}
+      MANTIS_AUTO_INSTALL: ${MANTIS_AUTO_INSTALL:-true}
+      MANTIS_COMPOSER_INSTALL: ${MANTIS_COMPOSER_INSTALL:-true}
+    depends_on:
+      db:
+        condition: service_healthy
+
+  db:
+    image: mariadb:10.11
+    command: --default-time-zone=+09:00
+    environment:
+      TZ: ${TZ:-Asia/Tokyo}
+      MARIADB_DATABASE: ${MANTIS_DB_NAME:-mantisbt}
+      MARIADB_USER: ${MANTIS_DB_USER:-mantisbt}
+      MARIADB_PASSWORD: ${MANTIS_DB_PASSWORD:-mantisbt}
+      MARIADB_ROOT_PASSWORD: ${MANTIS_DB_ROOT_PASSWORD:-root}
+    volumes:
+      - database-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+
+  phpmyadmin:
+    image: phpmyadmin:5.2.2
+    ports:
+      - "${PHPMYADMIN_HTTP_PORT:-8083}:80"
+    environment:
+      TZ: ${TZ:-Asia/Tokyo}
+      PMA_HOST: db
+      PMA_PORT: 3306
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  composer-vendor:
+  database-data:

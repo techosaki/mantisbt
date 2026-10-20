@@ -1,0 +1,13 @@
+.git
+.github
+.idea
+.vscode
+.aws
+.codex
+.agents
+node_modules
+vendor
+config/config_inc.php
+Dockerfile:Zone.Identifier
+docker-compose.yml:Zone.Identifier
+docker-entrypoint.sh:Zone.Identifier
