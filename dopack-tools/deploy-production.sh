@@ -138,12 +138,10 @@ rsync_options=(
 	--exclude=/node_modules/
 	--exclude=/vendor/
 	--exclude=/config/config_inc.php
-	--exclude=/config/config.inc.php
 	--exclude=/.htaccess
 	--exclude=/.htpasswd
 	--exclude=/.user.ini
 	--exclude=/mantis_offline.php
-	'--exclude=*:Zone.Identifier'
 )
 
 if [[ "$delete" == true ]]; then
