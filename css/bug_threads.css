@@ -1,0 +1,36 @@
+.bug-thread {
+	margin-bottom: 20px;
+}
+
+.bug-thread .widget-title {
+	float: none;
+	overflow-wrap: anywhere;
+}
+
+.bug-thread-meta,
+.bug-thread-note-meta {
+	margin-bottom: 8px;
+}
+
+.bug-thread-note {
+	border-top: 1px solid #ddd;
+	padding: 12px 0;
+}
+
+.bug-thread-note-body {
+	overflow-wrap: anywhere;
+	overflow-x: auto;
+}
+
+.bug-thread-older > summary {
+	cursor: pointer;
+	margin-bottom: 10px;
+	padding: 8px;
+	color: #337ab7;
+	background: #f5f5f5;
+	border: 1px solid #ddd;
+}
+
+.bug-thread-older > summary:focus-visible {
+	outline: 2px solid #337ab7;
+}

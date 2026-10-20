@@ -721,6 +721,13 @@ function layout_print_sidebar( $p_active_sidebar_page = null ) {
 			'icon' => 'fa-list-alt'
 		);
 
+		# Issue Threads
+		$t_sidebar_items[] = array(
+			'url' => 'view_all_bug_thread_page.php',
+			'title' => 'view_bug_threads_link',
+			'icon' => 'fa-comments'
+		);
+
 		# Report Bugs
 		if( access_has_any_project_level( 'report_bug_threshold' ) ) {
 			$t_sidebar_items[] = array(

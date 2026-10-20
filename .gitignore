@@ -2,6 +2,8 @@
 config/
 mantis_offline.php
 
+dopack-tools
+
 # Docbook builds
 docbook/*/*/builddate
 docbook/*/*/build

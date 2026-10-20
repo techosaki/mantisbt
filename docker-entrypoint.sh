@@ -54,9 +54,9 @@ $g_crypto_master_salt = $t_docker_env(
 );
 $g_default_timezone = $t_docker_env( 'TZ', 'Asia/Tokyo' );
 $g_path = $t_docker_env( 'MANTIS_URL', 'http://localhost:8082/' );
-$g_webmaster_email = $t_docker_env( 'MANTIS_WEBMASTER_EMAIL', 'webmaster@mantisbt.test' );
-$g_from_email = $t_docker_env( 'MANTIS_FROM_EMAIL', 'noreply@mantisbt.test' );
-$g_return_path_email = $t_docker_env( 'MANTIS_RETURN_PATH_EMAIL', 'admin@mantisbt.test' );
+$g_webmaster_email = $t_docker_env( 'MANTIS_WEBMASTER_EMAIL', 'bug-track@do-pack-system.com' );
+$g_from_email = $t_docker_env( 'MANTIS_FROM_EMAIL', 'bug-track@do-pack-system.com' );
+$g_return_path_email = $t_docker_env( 'MANTIS_RETURN_PATH_EMAIL', 'bug-track@do-pack-system.com' );
 
 unset( $t_docker_env );
 PHP
