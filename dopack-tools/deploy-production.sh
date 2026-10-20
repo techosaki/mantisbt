@@ -5,10 +5,11 @@ readonly LOCAL_ROOT="/home/user/mantisbt"
 readonly REMOTE_HOST="${DEPLOY_REMOTE_HOST:-dopack}"
 readonly REMOTE_ROOT="${DEPLOY_REMOTE_ROOT:-/home/dopack/do-pack-system.com/public_html/bug-track}"
 readonly REMOTE_PHP="${DEPLOY_REMOTE_PHP:-/home/dopack/bin/php}"
+readonly REMOTE_COMPOSER_PHP="${DEPLOY_REMOTE_COMPOSER_PHP:-/opt/php-8.3.35/bin/php}"
 readonly REMOTE_COMPOSER="${DEPLOY_REMOTE_COMPOSER:-/usr/bin/composer}"
 
 apply=false
-delete=false
+delete=true
 maintenance=true
 run_composer=true
 upgrade_database=true
@@ -16,24 +17,27 @@ maintenance_enabled=false
 
 usage() {
 	cat <<'USAGE'
-Usage: ./dopack-tools/deploy-production.sh [options]
+使用方法: ./dopack-tools/deploy-production.sh [オプション]
 
-Without --apply, rsync runs in dry-run mode and does not change the server.
+--applyを指定しない場合はドライランとなり、本番サーバーを変更しません。
 
-Options:
-  --apply             Apply the deployment to the production server
-  --delete            Delete remote files that no longer exist locally
-                      (production-only files remain protected by exclusions)
-  --no-maintenance    Do not enable the MantisBT maintenance page
-  --skip-composer     Do not run Composer on the remote server
-  --skip-db-upgrade   Do not run the MantisBT database schema upgrade
-  -h, --help          Show this help
+オプション:
+  --apply             本番サーバーへデプロイを適用する
+  --delete            削除同期を有効にする（既定の動作）
+  --no-delete         リモートにのみ存在するファイルを削除しない
+                      （本番固有ファイルは常に除外設定で保護されます）
+  --no-maintenance    MantisBTをメンテナンスモードに切り替えない
+  --skip-composer     リモートサーバーでComposerを実行しない
+  --skip-db-upgrade   MantisBTのデータベーススキーマを更新しない
+  -h, --help          このヘルプを表示する
 
-Environment overrides:
-  DEPLOY_REMOTE_HOST      SSH host (default: dopack)
-  DEPLOY_REMOTE_ROOT      Remote document root
-  DEPLOY_REMOTE_PHP       Remote PHP CLI binary
-  DEPLOY_REMOTE_COMPOSER  Remote Composer executable
+環境変数による設定変更:
+  DEPLOY_REMOTE_HOST      SSH接続先（既定値: dopack）
+  DEPLOY_REMOTE_ROOT      リモートの公開ルート
+  DEPLOY_REMOTE_PHP       リモートのPHP CLI実行ファイル
+  DEPLOY_REMOTE_COMPOSER_PHP
+                          Composer実行用のPHP CLI実行ファイル
+  DEPLOY_REMOTE_COMPOSER  リモートのComposer実行ファイル
 USAGE
 }
 
@@ -44,6 +48,9 @@ while (( $# > 0 )); do
 			;;
 		--delete)
 			delete=true
+			;;
+		--no-delete)
+			delete=false
 			;;
 		--no-maintenance)
 			maintenance=false
@@ -59,7 +66,7 @@ while (( $# > 0 )); do
 			exit 0
 			;;
 		*)
-			echo "Unknown option: $1" >&2
+			echo "不明なオプションです: $1" >&2
 			usage >&2
 			exit 2
 			;;
@@ -68,27 +75,29 @@ while (( $# > 0 )); do
 done
 
 if [[ ! -d "$LOCAL_ROOT/.git" ]]; then
-	echo "Local project root is invalid: $LOCAL_ROOT" >&2
+	echo "ローカルのプロジェクトルートが正しくありません: $LOCAL_ROOT" >&2
 	exit 1
 fi
 
 for command_name in ssh rsync; do
 	if ! command -v "$command_name" >/dev/null 2>&1; then
-		echo "Required command is not installed: $command_name" >&2
+		echo "必要なコマンドがインストールされていません: $command_name" >&2
 		exit 1
 	fi
 done
 
-echo "Checking production server..."
+echo "本番サーバーの環境を確認しています..."
 ssh "$REMOTE_HOST" bash -s -- \
-	"$REMOTE_ROOT" "$REMOTE_PHP" "$REMOTE_COMPOSER" "$maintenance" "$run_composer" <<'REMOTE_CHECK'
+	"$REMOTE_ROOT" "$REMOTE_PHP" "$REMOTE_COMPOSER_PHP" "$REMOTE_COMPOSER" \
+	"$maintenance" "$run_composer" <<'REMOTE_CHECK'
 set -eu
 
 remote_root=$1
 remote_php=$2
-remote_composer=$3
-use_maintenance=$4
-use_composer=$5
+remote_composer_php=$3
+remote_composer=$4
+use_maintenance=$5
+use_composer=$6
 
 test -d "$remote_root"
 test -w "$remote_root"
@@ -97,6 +106,7 @@ test -f "$remote_root/config/config_inc.php"
 command -v rsync >/dev/null 2>&1
 
 if [ "$use_composer" = true ]; then
+	test -x "$remote_composer_php"
 	test -f "$remote_composer"
 fi
 
@@ -106,12 +116,12 @@ fi
 
 "$remote_php" -r '
 	if (version_compare(PHP_VERSION, "8.1.0", "<")) {
-		fwrite(STDERR, "MantisBT requires PHP 8.1 or later." . PHP_EOL);
+		fwrite(STDERR, "MantisBTの実行にはPHP 8.1以上が必要です。" . PHP_EOL);
 		exit(1);
 	}
 	foreach (["mysqli", "mbstring", "json"] as $extension) {
 		if (!extension_loaded($extension)) {
-			fwrite(STDERR, "Missing PHP extension: $extension" . PHP_EOL);
+			fwrite(STDERR, "必要なPHP拡張がありません: $extension" . PHP_EOL);
 			exit(1);
 		}
 	}
@@ -150,29 +160,29 @@ fi
 
 if [[ "$apply" != true ]]; then
 	rsync_options+=(--dry-run)
-	echo "Dry run only; no production files will be changed."
-	echo "Comparing $LOCAL_ROOT/ with $REMOTE_HOST:$REMOTE_ROOT/"
+	echo "ドライランを実行します。本番ファイルは変更されません。"
+	echo "$LOCAL_ROOT/ と $REMOTE_HOST:$REMOTE_ROOT/ の差分を確認しています。"
 	rsync "${rsync_options[@]}" "$LOCAL_ROOT/" "$REMOTE_HOST:$REMOTE_ROOT/"
-	echo "Dry run completed. Run with --apply to deploy these changes."
+	echo "ドライランが完了しました。反映する場合は--applyを指定してください。"
 	exit 0
 fi
 
 leave_maintenance_on_failure() {
 	local exit_status=$?
 	if (( exit_status != 0 )) && [[ "$maintenance_enabled" == true ]]; then
-		echo "Deployment failed; MantisBT remains in maintenance mode." >&2
-		echo "After resolving the problem, remove: $REMOTE_ROOT/mantis_offline.php" >&2
+		echo "デプロイに失敗したため、MantisBTはメンテナンスモードのままです。" >&2
+		echo "問題の解決後、次のファイルを削除してください: $REMOTE_ROOT/mantis_offline.php" >&2
 	fi
 }
 trap leave_maintenance_on_failure EXIT
 
 if [[ "$maintenance" == true ]]; then
-	echo "Enabling MantisBT maintenance mode..."
+	echo "MantisBTをメンテナンスモードに切り替えています..."
 	ssh "$REMOTE_HOST" bash -s -- "$REMOTE_ROOT" <<'REMOTE_MAINTENANCE_ON'
 set -eu
 remote_root=$1
 if [ -e "$remote_root/mantis_offline.php" ]; then
-	echo "Maintenance file already exists; refusing to overwrite it." >&2
+	echo "メンテナンス用ファイルが既に存在するため、上書きせずに中止します。" >&2
 	exit 1
 fi
 cp "$remote_root/mantis_offline.php.sample" "$remote_root/mantis_offline.php"
@@ -180,17 +190,18 @@ REMOTE_MAINTENANCE_ON
 	maintenance_enabled=true
 fi
 
-echo "Synchronizing $LOCAL_ROOT/ to $REMOTE_HOST:$REMOTE_ROOT/"
+echo "$LOCAL_ROOT/ を $REMOTE_HOST:$REMOTE_ROOT/ へ同期しています。"
 rsync "${rsync_options[@]}" "$LOCAL_ROOT/" "$REMOTE_HOST:$REMOTE_ROOT/"
 
 if [[ "$run_composer" == true ]]; then
-	echo "Installing production Composer dependencies..."
-	ssh "$REMOTE_HOST" bash -s -- "$REMOTE_ROOT" "$REMOTE_PHP" "$REMOTE_COMPOSER" <<'REMOTE_COMPOSER_INSTALL'
+	echo "本番用のComposer依存パッケージをインストールしています..."
+	ssh "$REMOTE_HOST" bash -s -- \
+		"$REMOTE_ROOT" "$REMOTE_COMPOSER_PHP" "$REMOTE_COMPOSER" <<'REMOTE_COMPOSER_INSTALL'
 set -eu
 remote_root=$1
-remote_php=$2
+remote_composer_php=$2
 remote_composer=$3
-"$remote_php" "$remote_composer" install \
+"$remote_composer_php" "$remote_composer" install \
 	--working-dir="$remote_root" \
 	--no-dev \
 	--no-interaction \
@@ -201,18 +212,21 @@ REMOTE_COMPOSER_INSTALL
 fi
 
 if [[ "$upgrade_database" == true ]]; then
-	echo "Upgrading the MantisBT database schema..."
+	echo "MantisBTのデータベーススキーマを更新しています..."
 	ssh "$REMOTE_HOST" bash -s -- "$REMOTE_ROOT" "$REMOTE_PHP" <<'REMOTE_DATABASE_UPGRADE'
 set -eu
 remote_root=$1
 remote_php=$2
 cd "$remote_root"
-"$remote_php" admin/upgrade_unattended.php
+"$remote_php" -r '
+	$_GET["mbadmin"] = 1;
+	require "admin/upgrade_unattended.php";
+'
 REMOTE_DATABASE_UPGRADE
 fi
 
 if [[ "$maintenance_enabled" == true ]]; then
-	echo "Disabling MantisBT maintenance mode..."
+	echo "MantisBTのメンテナンスモードを解除しています..."
 	ssh "$REMOTE_HOST" bash -s -- "$REMOTE_ROOT" <<'REMOTE_MAINTENANCE_OFF'
 set -eu
 remote_root=$1
@@ -221,4 +235,4 @@ REMOTE_MAINTENANCE_OFF
 	maintenance_enabled=false
 fi
 
-echo "Production deployment completed successfully."
+echo "本番環境へのデプロイが正常に完了しました。"
