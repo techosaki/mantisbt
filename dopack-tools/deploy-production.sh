@@ -134,6 +134,7 @@ rsync_options=(
 	--human-readable
 	--itemize-changes
 	--delay-updates
+	--exclude=/AGENTS.md
 	--exclude=/.git/
 	--exclude=/.github/
 	--exclude=/.agents/
