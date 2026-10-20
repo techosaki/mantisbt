@@ -32,8 +32,7 @@ if [ "${MANTIS_COMPOSER_INSTALL:-true}" = "true" ]; then
 	composer install --no-interaction --no-progress --prefer-dist
 fi
 
-if [ ! -f /var/www/html/config/config_inc.php ] \
-	|| grep -qF 'Generated for the local Docker environment' /var/www/html/config/config_inc.php; then
+if [ ! -f /var/www/html/config/config_inc.php ]; then
 	echo "Creating config/config_inc.php from Docker environment variables."
 	cat > /var/www/html/config/config_inc.php <<'PHP'
 <?php
