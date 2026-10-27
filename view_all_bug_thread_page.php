@@ -6,6 +6,7 @@ require_once( 'core.php' );
 require_api( 'access_api.php' );
 require_api( 'authentication_api.php' );
 require_api( 'bugnote_api.php' );
+require_api( 'bug_thread_filter_api.php' );
 require_api( 'compress_api.php' );
 require_api( 'filter_api.php' );
 require_api( 'gpc_api.php' );
@@ -16,6 +17,9 @@ require_api( 'project_api.php' );
 require_api( 'string_api.php' );
 require_api( 'user_api.php' );
 
+require_js( 'bugFilter.js' );
+require_css( 'status_config.php' );
+
 auth_ensure_user_authenticated();
 
 $f_page_number = max( 1, gpc_get_int( 'page_number', 1 ) );
@@ -23,19 +27,17 @@ $t_project_id = gpc_get_int( 'project_id', helper_get_current_project() );
 if( ( ALL_PROJECTS == $t_project_id || project_exists( $t_project_id ) )
 	&& $t_project_id != helper_get_current_project() ) {
 	helper_set_current_project( $t_project_id );
-	print_header_redirect( 'view_all_bug_thread_page.php', true );
+	print_header_redirect( $_SERVER['REQUEST_URI'], false, true );
 }
 
-# Use a copy so the normal issue list's sort and page size are not changed.
-$t_filter = filter_get_bug_rows_filter();
-$t_filter[FILTER_PROPERTY_SORT_FIELD_NAME] = 'last_updated';
-$t_filter[FILTER_PROPERTY_SORT_DIRECTION] = 'DESC';
-$t_per_page = 10;
+# Use the same validated filter for the controls, query and pagination.
+$t_filter = filter_ensure_valid_filter( filter_get_bug_rows_filter() );
 $t_page_count = 0;
 $t_bug_count = 0;
 # Sort the complete filtered result before limiting it to the requested page.
-$t_query = new BugThreadFilterQuery( filter_ensure_valid_filter( $t_filter ) );
+$t_query = new BugThreadFilterQuery( $t_filter, array( 'use_sticky' => true ) );
 $t_bug_count = $t_query->get_bug_count();
+$t_per_page = max( 1, filter_per_page( $t_filter, $t_bug_count, null ) );
 $t_page_count = filter_page_count( $t_bug_count, $t_per_page );
 $f_page_number = filter_valid_page_number( $f_page_number, $t_page_count );
 $t_query->set_limit( $t_per_page );
@@ -48,6 +50,7 @@ compress_enable();
 html_robots_noindex();
 layout_page_header( lang_get( 'view_bug_threads_link' ) );
 layout_page_begin( __FILE__ );
+bug_thread_filter_draw_selection_area();
 ?>
 <div class="col-md-12 col-xs-12">
 	<h1 class="header smaller lighter"><?php echo lang_get( 'view_bug_threads_link' ) ?></h1>

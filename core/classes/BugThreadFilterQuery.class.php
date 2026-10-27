@@ -8,6 +8,18 @@
 class BugThreadFilterQuery extends BugFilterQuery {
 
 	protected function build_order_by() {
+		# Honor explicit sort choices; keep the established thread order for the
+		# default "last updated descending" selection.
+		if( $this->filter[FILTER_PROPERTY_SORT_FIELD_NAME] !== 'last_updated'
+			|| $this->filter[FILTER_PROPERTY_SORT_DIRECTION] !== 'DESC' ) {
+			parent::build_order_by();
+			return;
+		}
+
+		if( gpc_string_to_bool( $this->filter[FILTER_PROPERTY_STICKY] ) && $this->use_sticky ) {
+			$this->add_order( '{bug}.sticky DESC' );
+		}
+
 		# Urgent and immediate issues form a single group, ordered by latest note.
 		$this->add_select( 'CASE WHEN {bug}.priority IN (' . URGENT . ', ' . IMMEDIATE
 			. ') THEN 0 ELSE 1 END AS thread_priority_group' );
