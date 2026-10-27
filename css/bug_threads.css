@@ -7,6 +7,14 @@
 	overflow-wrap: anywhere;
 }
 
+.bug-thread .widget-title > a,
+.bug-thread .widget-title > a:visited,
+.bug-thread .widget-title > a:hover,
+.bug-thread .widget-title > a:focus,
+.bug-thread .widget-title > a:active {
+	color: #fff;
+}
+
 .bug-thread-meta,
 .bug-thread-note-meta {
 	margin-bottom: 8px;
