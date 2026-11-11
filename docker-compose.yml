@@ -8,6 +8,7 @@ services:
     volumes:
       - .:/var/www/html
       - composer-vendor:/var/www/html/vendor
+      - ./mantisbt_file_store:/var/mantisbt_file_store
     environment:
       TZ: ${TZ:-Asia/Tokyo}
       MANTIS_DB_HOST: db

@@ -1,5 +1,6 @@
 # Config files
 config/
+mantisbt_file_store/
 mantis_offline.php
 
 dopack-tools

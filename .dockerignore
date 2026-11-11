@@ -8,6 +8,7 @@
 node_modules
 vendor
 config/config_inc.php
+mantisbt_file_store
 Dockerfile:Zone.Identifier
 docker-compose.yml:Zone.Identifier
 docker-entrypoint.sh:Zone.Identifier
