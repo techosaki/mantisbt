@@ -23,6 +23,28 @@ require_api( 'user_api.php' );
 require_js( 'bugFilter.js' );
 require_css( 'status_config.php' );
 
+function bug_thread_print_attachments( array $p_attachments ) {
+	if( !$p_attachments ) {
+		return;
+	}
+	echo '<div class="bug-thread-attachments">';
+	foreach( $p_attachments as $t_attachment ) {
+		$t_name = string_attribute( $t_attachment['display_name'] );
+		if( !$t_attachment['exists'] || !$t_attachment['can_download'] ) {
+			echo '<span>' . $t_name . '</span>';
+			continue;
+		}
+		$t_url = string_attribute( $t_attachment['download_url'] );
+		if( $t_attachment['type'] === 'image' ) {
+			$t_inline_url = string_attribute( $t_attachment['download_url'] . '&show_inline=1' . form_security_param( 'file_show_inline' ) );
+			echo '<a href="' . $t_url . '"><img src="' . $t_inline_url . '" alt="' . $t_name . '" loading="lazy"></a>';
+		} else {
+			echo '<a href="' . $t_url . '">' . $t_name . '</a>';
+		}
+	}
+	echo '</div>';
+}
+
 auth_ensure_user_authenticated();
 
 $f_page_number = max( 1, gpc_get_int( 'page_number', 1 ) );
@@ -75,6 +97,10 @@ foreach( $t_rows as $t_bug ) {
 			continue;
 		}
 		$t_notes = bugnote_get_all_visible_bugnotes( $t_bug->id, 'ASC', 0 );
+		$t_attachments_by_note = array();
+		foreach( file_get_visible_attachments( $t_bug->id ) as $t_attachment ) {
+			$t_attachments_by_note[$t_attachment['bugnote_id']][] = $t_attachment;
+		}
 		$t_older_count = max( 0, count( $t_notes ) - 5 );
 		$t_note_groups = array(
 			array_slice( $t_notes, 0, $t_older_count ),
@@ -108,6 +134,9 @@ foreach( $t_rows as $t_bug ) {
 					printf( ' (%s)', prepare_user_name( $t_bug->handler_id ) );
 				}
 				?>
+				/ <?php echo lang_get( 'priority' ) . ': '; print_status_icon( $t_bug->priority ); echo ' ' . string_display_line( get_enum_element( 'priority', $t_bug->priority, $t_current_user, $t_bug->project_id ) ) ?>
+				/ <?php echo lang_get( 'severity' ) . ': ' . string_display_line( get_enum_element( 'severity', $t_bug->severity, $t_current_user, $t_bug->project_id ) ) ?>
+				/ <?php echo lang_get( 'resolution' ) . ': ' . string_display_line( get_enum_element( 'resolution', $t_bug->resolution, $t_current_user, $t_bug->project_id ) ) ?>
 				/ <?php echo lang_get( 'updated' ) . ': ' . date( $t_date_format, $t_bug->last_updated ) ?>
 			</p>
 <?php if( in_array( 'description', columns_filter_disabled( config_get( 'bug_view_page_fields' ) ) ) ) { ?>
@@ -116,29 +145,7 @@ foreach( $t_rows as $t_bug ) {
 			</div>
 <?php } ?>
 <?php
-		$t_attachments = file_get_visible_attachments( $t_bug->id );
-		if( $t_attachments ) {
-?>
-			<div class="bug-thread-attachments">
-<?php
-			foreach( $t_attachments as $t_attachment ) {
-				$t_name = string_attribute( $t_attachment['display_name'] );
-				if( !$t_attachment['exists'] || !$t_attachment['can_download'] ) {
-					echo '<span>' . $t_name . '</span>';
-					continue;
-				}
-				$t_url = string_attribute( $t_attachment['download_url'] );
-				if( $t_attachment['type'] === 'image' && $t_attachment['preview'] ) {
-					$t_inline_url = string_attribute( $t_attachment['download_url'] . '&show_inline=1' . form_security_param( 'file_show_inline' ) );
-					echo '<a href="' . $t_url . '"><img src="' . $t_inline_url . '" alt="' . $t_name . '" loading="lazy"></a>';
-				} else {
-					echo '<a href="' . $t_url . '">' . $t_name . '</a>';
-				}
-			}
-?>
-			</div>
-<?php } ?>
-<?php
+		bug_thread_print_attachments( $t_attachments_by_note[0] ?? array() );
 		foreach( $t_note_groups as $t_group_index => $t_group ) {
 			if( !$t_group ) {
 				continue;
@@ -162,6 +169,7 @@ foreach( $t_rows as $t_bug ) {
 <?php } ?>
 				</div>
 				<div class="bug-thread-note-body"><?php echo string_display_links( $t_note->note ) ?></div>
+				<?php bug_thread_print_attachments( $t_attachments_by_note[$t_note->id] ?? array() ) ?>
 			</article>
 <?php
 			}
