@@ -140,7 +140,7 @@ $t_finished = false;
 $t_bugnote = false;
 
 $t_external_action_prefix = 'EXT_';
-if( strpos( $f_action, $t_external_action_prefix ) === 0 ) {
+if( str_starts_with( $f_action, $t_external_action_prefix ) ) {
 	$t_form_page = 'bug_actiongroup_ext_page.php';
 	require_once( $t_form_page );
 	exit;
@@ -157,7 +157,7 @@ foreach( $t_custom_group_actions as $t_custom_group_action ) {
 
 # Check if user selected to update a custom field.
 $t_custom_fields_prefix = 'custom_field_';
-if( strpos( $f_action, $t_custom_fields_prefix ) === 0 ) {
+if( str_starts_with( $f_action, $t_custom_fields_prefix ) ) {
 	$t_custom_field_id = (int)substr( $f_action, mb_strlen( $t_custom_fields_prefix ) );
 	$f_action = 'CUSTOM';
 	$t_event_params['action'] = $f_action;
@@ -254,6 +254,10 @@ switch( $f_action ) {
 		require_api( 'datetimepicker_api.php' );
 		break;
 	case 'CUSTOM' :
+		/** @noinspection PhpUndefinedVariableInspection */
+		if( !custom_field_has_write_access_to_project( $t_custom_field_id, $t_project_id ) ) {
+			throw new ClientException( "Access denied", ERROR_ACCESS_DENIED );
+		}
 		$t_custom_field_def = custom_field_get_definition( $t_custom_field_id );
 		$t_question_title = sprintf( lang_get( 'actiongroup_menu_update_field' ),
 			string_attribute( lang_get_defaulted( $t_custom_field_def['name'] ) )

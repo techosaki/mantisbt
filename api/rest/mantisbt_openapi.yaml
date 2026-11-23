@@ -4,7 +4,7 @@
 openapi: 3.0.3
 info:
   title: Mantis Bug Tracker REST API
-  version: 2.29.0-dev
+  version: 2.29.0
   description: |-
     REST API calls have to be authenticated by creating an API token for the user doing the calls,
     and then passing the API token in the 'Authorization' header.  However, for anonymous access,
@@ -1328,6 +1328,29 @@ paths:
         - 'Project Versions'
       parameters:
         - $ref: '#/components/parameters/project_id'
+        - name: released
+          in: query
+          schema:
+            type: boolean
+          description: >-
+            true to return only released versions, false to return only
+            unreleased versions. If omitted, versions are returned regardless
+            of their released status.
+          required: false
+        - name: obsolete
+          in: query
+          schema:
+            type: boolean
+            default: false
+          description: Include obsolete versions.
+          required: false
+        - name: inherit
+          in: query
+          schema:
+            type: boolean
+            default: false
+          description: Include versions inherited from parent projects.
+          required: false
       responses:
         '200':
           $ref: '#/components/responses/Success'

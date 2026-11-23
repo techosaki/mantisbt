@@ -1205,25 +1205,25 @@ function mc_issue_update( $p_username, $p_password, $p_issue_id, stdClass $p_iss
 			$t_bugnotes_by_id[$t_bugnote->id] = $t_bugnote;
 		}
 
-		$t_update_bugnote_threshold = config_get( 'update_bugnote_threshold', null, $t_user_id, $t_project_id );
-		$t_bugnote_user_edit_threshold = config_get( 'bugnote_user_edit_threshold', null, $t_user_id, $t_project_id );
+		$t_update_any_bugnote_threshold = config_get( 'update_bugnote_threshold', null, $t_user_id, $t_project_id );
+		$t_update_own_bugnote_threshold = config_get( 'bugnote_user_edit_threshold', null, $t_user_id, $t_project_id );
 
 		foreach( $p_issue['notes'] as $t_note ) {
 			$t_note = ApiObjectFactory::objectToArray( $t_note );
-			$t_view_state = $t_note['view_state'] ?? config_get( 'default_bugnote_view_status' );
 
 			if( isset( $t_note['id'] ) && ( (int)$t_note['id'] > 0 ) ) {
 				$t_bugnote_id = (int)$t_note['id'];
-
-				$t_view_state_id = mci_get_enum_id_from_objectref( 'view_state', $t_view_state );
 
 				if( array_key_exists( $t_bugnote_id, $t_bugnotes_by_id ) ) {
 					$t_bugnote = $t_bugnotes_by_id[$t_bugnote_id];
 
 					# Make sure user is allowed to edit the individual note
 					$t_user_owns_note = $t_bugnote->reporter_id == $t_user_id;
-					$t_edit_threshold = $t_user_owns_note ? $t_bugnote_user_edit_threshold : $t_update_bugnote_threshold;
-					if( !access_has_bugnote_level( $t_edit_threshold, $t_bugnote_id, $t_user_id ) ) {
+					$t_user_can_update_own_bugnote = $t_user_owns_note
+						&& access_has_bugnote_level( $t_update_own_bugnote_threshold, $t_bugnote_id, $t_user_id );
+					if( !$t_user_can_update_own_bugnote
+						&& !access_has_bugnote_level( $t_update_any_bugnote_threshold, $t_bugnote_id, $t_user_id )
+					) {
 						return mci_fault_access_denied( $t_user_id , "Not allowed to update note $t_bugnote_id" );
 					}
 
@@ -1234,9 +1234,13 @@ function mc_issue_update( $p_username, $p_password, $p_issue_id, stdClass $p_iss
 						$t_bugnote_changed = true;
 					}
 
-					if( $t_bugnote->view_state != $t_view_state_id ) {
-						bugnote_set_view_state( $t_bugnote_id, $t_view_state_id == VS_PRIVATE );
-						$t_bugnote_changed = true;
+					# Only change the view state if specified, otherwise keep it
+					if( isset( $t_note['view_state'] ) ) {
+						$t_view_state_id = mci_get_enum_id_from_objectref( 'view_state', $t_note['view_state'] );
+						if( $t_bugnote->view_state != $t_view_state_id ) {
+							bugnote_set_view_state( $t_bugnote_id, $t_view_state_id == VS_PRIVATE );
+							$t_bugnote_changed = true;
+						}
 					}
 
 					if( isset( $t_note['time_tracking']) && $t_note['time_tracking'] != $t_bugnote->time_tracking ) {
@@ -1542,18 +1546,17 @@ function mc_issue_note_update( $p_username, $p_password, stdClass $p_note ) {
 		return mci_fault_access_denied( $t_user_id );
 	}
 
-	# Check if the user owns the bugnote and is allowed to update their own bugnotes
-	# regardless of the update_bugnote_threshold level.
-	$t_user_owns_the_bugnote = bugnote_is_user_reporter( $t_issue_note_id, $t_user_id );
-	$t_user_can_update_own_bugnote = config_get( 'bugnote_user_edit_threshold', null, $t_user_id, $t_project_id );
-	if( $t_user_owns_the_bugnote && !$t_user_can_update_own_bugnote ) {
-		return mci_fault_access_denied( $t_user_id );
-	}
+	$t_update_any_bugnote_threshold = config_get( 'update_bugnote_threshold', null, $t_user_id, $t_project_id );
+	$t_update_own_bugnote_threshold = config_get( 'bugnote_user_edit_threshold', null, $t_user_id, $t_project_id );
 
-	# Check if the user has an access level beyond update_bugnote_threshold for the
-	# project containing the bugnote to update.
-	$t_update_bugnote_threshold = config_get( 'update_bugnote_threshold', null, $t_user_id, $t_project_id );
-	if( !$t_user_owns_the_bugnote && !access_has_bugnote_level( $t_update_bugnote_threshold, $t_issue_note_id, $t_user_id ) ) {
+	# Check if the user owns the bugnote and is allowed to update their own bugnotes,
+	# or if their access level allows updating any bugnote in the project.
+	$t_user_owns_note = bugnote_is_user_reporter( $t_issue_note_id, $t_user_id );
+	$t_user_can_update_own_bugnote = $t_user_owns_note
+		&& access_has_bugnote_level( $t_update_own_bugnote_threshold, $t_issue_note_id, $t_user_id );
+	if( !$t_user_can_update_own_bugnote
+		&& !access_has_bugnote_level( $t_update_any_bugnote_threshold, $t_issue_note_id, $t_user_id )
+	) {
 		return mci_fault_access_denied( $t_user_id );
 	}
 
